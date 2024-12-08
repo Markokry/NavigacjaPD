@@ -1,4 +1,4 @@
-package com.example.mapnavigationapp.view
+package com.example.mapnavigationapp.view.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -6,7 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.mapnavigationapp.model.Marker
+import com.example.mapnavigationapp.dto.view.MarkerDTO
 import com.example.mapnavigationapp.viewmodel.MapViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,11 +58,11 @@ fun MarkerManagementScreen(
             Button(onClick = {
                 if (markerId != null) {
                     viewModel.updateMarker(
-                        Marker(markerId, latitude.toDouble(), longitude.toDouble(), title)
+                        MarkerDTO(markerId, latitude.toDouble(), longitude.toDouble(), title)
                     )
                 } else {
                     viewModel.addMarker(
-                        Marker(
+                        MarkerDTO(
                             id = (viewModel.filteredMarkers.maxOfOrNull { it.id } ?: 0) + 1,
                             latitude = latitude.toDouble(),
                             longitude = longitude.toDouble(),

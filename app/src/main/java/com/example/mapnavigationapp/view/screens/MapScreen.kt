@@ -1,4 +1,4 @@
-package com.example.mapnavigationapp.view
+package com.example.mapnavigationapp.view.screens
 
 import android.content.Context
 import android.os.Bundle
@@ -12,23 +12,29 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.DrawerValue
-import androidx.compose.material.ModalDrawer
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.rememberDrawerState
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,7 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.mapnavigationapp.model.Marker
+import com.example.mapnavigationapp.dto.view.MarkerDTO
+import com.example.mapnavigationapp.view.AppNavigation
+import com.example.mapnavigationapp.view.components.location.LocationSearchResult
 import com.example.mapnavigationapp.viewmodel.MapViewModel
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
@@ -82,11 +90,11 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
     val filteredMarkers = viewModel.filteredMarkers
     val routes = viewModel.routes
 
-    var currentRouteMarkers by remember { mutableStateOf<List<Marker>>(emptyList()) }
+    var currentRouteMarkers by remember { mutableStateOf<List<MarkerDTO>>(emptyList()) }
     Configuration.getInstance()
         .load(context, context.getSharedPreferences("osm_prefs", Context.MODE_PRIVATE))
 
-    fun addRoute(marker: Marker) {
+    fun addRoute(marker: MarkerDTO) {
         if (currentRouteMarkers.isEmpty()) {
             currentRouteMarkers = listOf(marker)
         } else {
@@ -103,9 +111,12 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val coroutineScope = rememberCoroutineScope()
 
+    val locationSearchText by viewModel.locationSearchText.collectAsState()
+    val locationIsSearching by viewModel.locationIsSearching.collectAsState()
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Drawer Section for search and buttons
-        ModalDrawer(
+        ModalNavigationDrawer(
             drawerState = drawerState,
             gesturesEnabled = false, // Disables gestures (closing with gesture in conflict with map)
             drawerContent = {
@@ -123,8 +134,59 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
+                    SearchBar(
+                        inputField = {
+                            SearchBarDefaults.InputField(
+                                query = locationSearchText,
+                                onQueryChange = viewModel::onLocationSearchTextChange,
+                                onSearch = viewModel::onLocationSearchTextChange,
+                                expanded = locationIsSearching,
+                                onExpandedChange = { viewModel.onLocationToggleSearch() },
+                                enabled = true,
+                                placeholder = {
+                                    Text(text = "Search for locations...")
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        contentDescription = null
+                                    )
+                                },
+                                trailingIcon = {},
+                                interactionSource = null,
+                            )
+                        },
+                        modifier = Modifier,
+                        shape = SearchBarDefaults.inputFieldShape,
+                        colors = SearchBarDefaults.colors(),
+                        expanded = locationIsSearching,
+                        onExpandedChange = { viewModel.onLocationToggleSearch() },
+                        tonalElevation = 0.dp,
+                        shadowElevation = SearchBarDefaults.ShadowElevation,
+                        windowInsets = SearchBarDefaults.windowInsets
+                    ) {
+                        LazyColumn {
+                            items(count = viewModel.locations.size,
+                                key = { index -> index },
+                                itemContent = { index ->
+                                    val location = viewModel.locations[index]
+                                    LocationSearchResult(result = location)
+                                    HorizontalDivider()
+                                }
+                            )
+                        }
+                    }
+                    HorizontalDivider(
+                        modifier = Modifier
+                            .padding(
+                                top = 12.dp,
+                                bottom = 12.dp
+                            )
+                    )
                     TextField(
                         value = searchText,
+                        shape = SearchBarDefaults.inputFieldShape,
                         onValueChange = { searchText = it },
                         label = { Text("Search Marker") },
                         placeholder = { Text("Enter marker name...") },

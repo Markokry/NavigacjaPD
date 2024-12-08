@@ -1,22 +1,44 @@
 package com.example.mapnavigationapp.viewmodel
 
+import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.mapnavigationapp.MyApplication
+import com.example.mapnavigationapp.client.graph.ApiGraphService
 import com.example.mapnavigationapp.database.AppDatabase
-import com.example.mapnavigationapp.model.Marker
-import com.example.mapnavigationapp.model.MarkerEntity
-import com.example.mapnavigationapp.model.Route
-import com.example.mapnavigationapp.model.RouteEntity
+import com.example.mapnavigationapp.dto.graph.geocoding.GeocodingResultDTO
+import com.example.mapnavigationapp.dto.graph.geocoding.LocationHitDTO
+import com.example.mapnavigationapp.dto.view.MarkerDTO
+import com.example.mapnavigationapp.dto.view.RouteDTO
+import com.example.mapnavigationapp.entity.MarkerEntity
+import com.example.mapnavigationapp.entity.RouteEntity
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class MapViewModel : ViewModel() {
 
     private val db: AppDatabase = AppDatabase.getDatabase(MyApplication.getAppContext())
 
-    val filteredMarkers = mutableStateListOf<Marker>()
-    val routes = mutableListOf<Route>()
+    // czy wyszukiwanie
+    private val _locationIsSearching = MutableStateFlow(false)
+    val locationIsSearching = _locationIsSearching.asStateFlow()
+
+    // co wpisal Użytkownik
+    private val _locationSearchText = MutableStateFlow("")
+    val locationSearchText = _locationSearchText.asStateFlow()
+
+    // filtrowanie lokalizacji po API
+    private val _locations = mutableStateListOf<LocationHitDTO>()
+    val locations: List<LocationHitDTO>
+        get() = _locations
+
+    val filteredMarkers = mutableStateListOf<MarkerDTO>()
+    val routes = mutableListOf<RouteDTO>()
 
     init {
         initializeSampleMarkers()
@@ -42,7 +64,7 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    fun addMarker(marker: Marker) {
+    fun addMarker(marker: MarkerDTO) {
         viewModelScope.launch {
             db.mapDao().insertMarker(
                 MarkerEntity(marker.id, marker.latitude, marker.longitude, marker.title)
@@ -51,7 +73,7 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    fun updateMarker(marker: Marker) {
+    fun updateMarker(marker: MarkerDTO) {
         viewModelScope.launch {
             db.mapDao().updateMarker(
                 MarkerEntity(marker.id, marker.latitude, marker.longitude, marker.title)
@@ -73,7 +95,7 @@ class MapViewModel : ViewModel() {
     private fun fetchMarkersFromDatabase() {
         viewModelScope.launch {
             val markers = db.mapDao().getAllMarkers().map { marker ->
-                Marker(marker.id, marker.latitude, marker.longitude, marker.title)
+                MarkerDTO(marker.id, marker.latitude, marker.longitude, marker.title)
             }
             filteredMarkers.clear()
             filteredMarkers.addAll(markers)
@@ -87,13 +109,13 @@ class MapViewModel : ViewModel() {
             }
             filteredMarkers.clear()
             filteredMarkers.addAll(filtered.map {
-                Marker(it.id, it.latitude, it.longitude, it.title)
+                MarkerDTO(it.id, it.latitude, it.longitude, it.title)
             })
         }
     }
 
-    fun createRoute(startMarker: Marker, endMarker: Marker) {
-        val route = Route(
+    fun createRoute(startMarker: MarkerDTO, endMarker: MarkerDTO) {
+        val route = RouteDTO(
             id = routes.size + 1,
             name = "Route from ${startMarker.title} to ${endMarker.title}",
             markers = listOf(startMarker, endMarker)
@@ -108,4 +130,80 @@ class MapViewModel : ViewModel() {
     fun clearRoutes() {
         routes.clear()
     }
+
+    fun onLocationSearchTextChange(text: String) {
+        _locationSearchText.value = text
+        getLocationsFromAPI()
+    }
+
+    fun onLocationToggleSearch() {
+        _locationIsSearching.value = !_locationIsSearching.value
+        if (!_locationIsSearching.value) {
+            onLocationSearchTextChange("")
+        }
+    }
+
+    private fun getLocationsFromAPI() {
+        viewModelScope.launch {
+            try {
+                _locations.clear()
+                if (!locationIsSearching.value) {
+                    return@launch
+                }
+                val searchPhrase: String = locationSearchText.value
+                if (searchPhrase.isEmpty()) {
+                    return@launch
+                }
+                if (searchPhrase.length < 3) {
+                    return@launch
+                }
+                val apiService = ApiGraphService.getInstance()
+                apiService.geocode(
+                    searchPhrase = locationSearchText.value,
+                    locale = "en"   // jako stala powinno byc
+                ).enqueue(
+                    object : Callback<GeocodingResultDTO> {
+                        override fun onResponse(
+                            call: Call<GeocodingResultDTO>,
+                            response: Response<GeocodingResultDTO>
+                        ) {
+                            if (response.isSuccessful) {
+                                val result: GeocodingResultDTO? = response.body()
+                                if (result != null) {
+                                    _locations.addAll(
+                                        result.hits
+                                    )
+                                } else {
+                                    Log.e(
+                                        "MapNavigationApp",
+                                        "Geocoding error occurred... Response body is blank...",
+                                    )
+                                }
+                            } else {
+                                Log.e(
+                                    "MapNavigationApp",
+                                    "Geocoding error occurred... Response body is not successful...",
+                                )
+                            }
+                        }
+
+                        override fun onFailure(call: Call<GeocodingResultDTO>, t: Throwable) {
+                            Log.e(
+                                "MapNavigationApp",
+                                "Geocoding error occurred... Call failure...",
+                                t
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(
+                    "MapNavigationApp",
+                    "Geocoding error occurred...",
+                    e
+                )
+            }
+        }
+    }
+
 }

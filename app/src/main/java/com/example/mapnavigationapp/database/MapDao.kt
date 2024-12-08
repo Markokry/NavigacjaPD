@@ -1,8 +1,8 @@
 package com.example.mapnavigationapp.database
 
 import androidx.room.*
-import com.example.mapnavigationapp.model.MarkerEntity
-import com.example.mapnavigationapp.model.RouteEntity
+import com.example.mapnavigationapp.entity.MarkerEntity
+import com.example.mapnavigationapp.entity.RouteEntity
 
 @Dao
 interface MapDao {
