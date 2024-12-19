@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,7 +89,10 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
     val filteredMarkers = viewModel.filteredMarkers
-    val routes = viewModel.routes
+
+    val mapCenter = viewModel.mapCenter
+
+    val routePoints by rememberUpdatedState(viewModel.routePoints)
 
     var currentRouteMarkers by remember { mutableStateOf<List<MarkerDTO>>(emptyList()) }
     Configuration.getInstance()
@@ -120,13 +124,6 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
             drawerState = drawerState,
             gesturesEnabled = false, // Disables gestures (closing with gesture in conflict with map)
             drawerContent = {
-                // Close Button inside the drawer to close the drawer
-                IconButton(
-                    onClick = { coroutineScope.launch { drawerState.close() } },
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Close Drawer")
-                }
 
                 // Search Section
                 Column(
@@ -134,6 +131,15 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
+                    // Close Button inside the drawer to close the drawer
+                    IconButton(
+                        onClick = { coroutineScope.launch { drawerState.close() } },
+                    ) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close Drawer")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     SearchBar(
                         inputField = {
                             SearchBarDefaults.InputField(
@@ -171,7 +177,20 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
                                 key = { index -> index },
                                 itemContent = { index ->
                                     val location = viewModel.locations[index]
-                                    LocationSearchResult(result = location)
+                                    LocationSearchResult(
+                                        result = location,
+                                        onClick = {
+                                            val marker =                                                 MarkerDTO(
+                                                id = (viewModel.filteredMarkers.maxOfOrNull { it.id } ?: 0) + 1,
+                                                latitude = location.point.lat,
+                                                longitude = location.point.lng,
+                                                title = location.name
+                                            )
+                                            viewModel.addMarker(marker)
+                                            viewModel.centerMap(marker)
+                                            navController.navigate("map")
+                                        }
+                                    )
                                     HorizontalDivider()
                                 }
                             )
@@ -184,48 +203,30 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
                                 bottom = 12.dp
                             )
                     )
-                    TextField(
-                        value = searchText,
-                        shape = SearchBarDefaults.inputFieldShape,
-                        onValueChange = { searchText = it },
-                        label = { Text("Search Marker") },
-                        placeholder = { Text("Enter marker name...") },
-                        modifier = Modifier.fillMaxWidth(),
-                        trailingIcon = {
-                            if (searchText.isNotEmpty()) {
-                                IconButton(onClick = { searchText = "" }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Clear,
-                                        contentDescription = "Clear"
-                                    )
-                                }
-                            }
-                        }
-                    )
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Button Row - Filter and Add Marker
                     Column(
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        // Nowy przycisk do Route Planner
                         Button(
-                            onClick = { viewModel.filterMarkers(searchText) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp),
-                            // enabled = searchText.isNotEmpty() // Turned off - clearing filtering
+                            onClick = { navController.navigate("route_planner") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                         ) {
-                            Text("Filter")
+                            Text("Route Planner")
                         }
 
+                        // lista markerow
                         Button(
-                            onClick = { navController.navigate("manage_marker/-1") },
-                            modifier = Modifier
-                                .fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            onClick = { navController.navigate("markers_list") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                         ) {
-                            Text("Add Marker")
+                            Text("Markers List")
                         }
+
                     }
                 }
             },
@@ -240,8 +241,9 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
                     it.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
                     it.setMultiTouchControls(true)
                     it.controller.setZoom(15.0)
-                    it.controller.setCenter(GeoPoint(51.5, -0.1)) // Default map center (London)
+                    it.controller.setCenter(mapCenter.value) // Default map center
 
+                    // Overlay markerów
                     val overlayItems = filteredMarkers.map { marker ->
                         OverlayItem(marker.title, "", GeoPoint(marker.latitude, marker.longitude))
                     }
@@ -256,8 +258,7 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
                                     context,
                                     "Tapped on ${item?.title}",
                                     Toast.LENGTH_SHORT
-                                )
-                                    .show()
+                                ).show()
 
                                 val tappedMarker = filteredMarkers[index]
                                 addRoute(tappedMarker) // Add to current route
@@ -272,32 +273,11 @@ fun MapScreenContent(viewModel: MapViewModel = viewModel(), navController: NavCo
                     it.overlays.clear()
                     it.overlays.add(overlay)
 
-                    routes.forEach { route ->
-                        val start = route.markers.first()
-                        val end = route.markers.last()
-                        val line = Polyline().apply {
-                            addPoint(GeoPoint(start.latitude, start.longitude))
-                            addPoint(GeoPoint(end.latitude, end.longitude))
+                    if (routePoints.isNotEmpty()) {
+                        val routeLine = Polyline().apply {
+                            setPoints(routePoints)
                         }
-                        it.overlays.add(line)
-                    }
-
-                    if (currentRouteMarkers.size == 2) {
-                        val line = Polyline().apply {
-                            addPoint(
-                                GeoPoint(
-                                    currentRouteMarkers[0].latitude,
-                                    currentRouteMarkers[0].longitude
-                                )
-                            )
-                            addPoint(
-                                GeoPoint(
-                                    currentRouteMarkers[1].latitude,
-                                    currentRouteMarkers[1].longitude
-                                )
-                            )
-                        }
-                        it.overlays.add(line)
+                        it.overlays.add(routeLine)
                     }
                 }
             }

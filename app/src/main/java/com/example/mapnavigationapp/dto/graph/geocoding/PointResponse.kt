@@ -13,7 +13,7 @@ package com.example.mapnavigationapp.dto.graph.geocoding
 import com.google.gson.annotations.SerializedName
 
 
-data class PointDTO(
+data class PointResponse(
 
     @SerializedName("lat")
     val lat: Double,
