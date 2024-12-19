@@ -1,4 +1,4 @@
-package com.example.mapnavigationapp.model
+package com.example.mapnavigationapp.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

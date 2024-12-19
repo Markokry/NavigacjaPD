@@ -1,6 +1,6 @@
-package com.example.mapnavigationapp.model
+package com.example.mapnavigationapp.dto.view
 
-data class Marker(
+data class MarkerDTO(
     val id: Int,
     val latitude: Double,
     val longitude: Double,
