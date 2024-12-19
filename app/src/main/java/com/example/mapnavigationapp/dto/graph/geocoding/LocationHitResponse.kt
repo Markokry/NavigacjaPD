@@ -13,10 +13,10 @@ package com.example.mapnavigationapp.dto.graph.geocoding
 import com.google.gson.annotations.SerializedName
 
 
-data class LocationHitDTO(
+data class LocationHitResponse(
 
     @SerializedName("point")
-    val point: PointDTO,
+    val point: PointResponse,
 
     @SerializedName("extent")
     val extent: List<Double>,
@@ -42,4 +42,9 @@ data class LocationHitDTO(
     @SerializedName("osm_value")
     val osmValue: String,
 
-)
+    ) {
+
+    fun formatLatLng(): String {
+        return "${point.lat}, ${point.lng}"
+    }
+}

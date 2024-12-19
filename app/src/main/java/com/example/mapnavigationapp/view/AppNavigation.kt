@@ -7,6 +7,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.mapnavigationapp.view.screens.MapScreenContent
 import com.example.mapnavigationapp.view.screens.MarkerManagementScreen
+import com.example.mapnavigationapp.view.screens.MarkersListScreen
+import com.example.mapnavigationapp.view.screens.RoutePlannerScreen
 import com.example.mapnavigationapp.viewmodel.MapViewModel
 
 @Composable
@@ -25,6 +27,12 @@ fun AppNavigation(viewModel: MapViewModel) {
                 viewModel = viewModel,
                 markerId = if (markerId != -1) markerId else null
             )
+        }
+        composable("route_planner") {
+            RoutePlannerScreen(viewModel, navController)
+        }
+        composable("markers_list") {
+            MarkersListScreen(viewModel, navController)
         }
     }
 }

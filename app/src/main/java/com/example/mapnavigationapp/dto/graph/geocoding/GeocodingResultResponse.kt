@@ -13,10 +13,10 @@ package com.example.mapnavigationapp.dto.graph.geocoding
 import com.google.gson.annotations.SerializedName
 
 
-data class GeocodingResultDTO(
+data class GeocodingResultResponse(
 
     @SerializedName("hits")
-    val hits: List<LocationHitDTO>,
+    val hits: List<LocationHitResponse>,
 
     @SerializedName("locale")
     val locale: String,
