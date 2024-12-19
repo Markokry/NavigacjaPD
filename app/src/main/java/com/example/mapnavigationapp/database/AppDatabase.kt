@@ -4,10 +4,10 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.example.mapnavigationapp.model.MarkerEntity
-import com.example.mapnavigationapp.model.RouteEntity
+import com.example.mapnavigationapp.entity.MarkerEntity
+import com.example.mapnavigationapp.entity.RouteEntity
 
-@Database(entities = [MarkerEntity::class, RouteEntity::class], version = 1)
+@Database(entities = [MarkerEntity::class, RouteEntity::class], version = 1, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun mapDao(): MapDao
 
